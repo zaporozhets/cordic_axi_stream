@@ -12,5 +12,5 @@ docker run -it --net=host -v "$(pwd)":"$(pwd)":rw --workdir "$(pwd)" ghcr.io/zap
 
 # Run tests for baseband
 ```sh
-pytest -s ./baseband/test/
+pytest -s ./test/
 ```
