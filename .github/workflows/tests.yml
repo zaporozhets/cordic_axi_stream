@@ -1,0 +1,27 @@
+name: CI
+
+on: [ push ]
+
+jobs:
+  tests-cocotb:
+    name: cocotb tests
+    runs-on: ubuntu-latest
+    container: ghcr.io/zaporozhets/cordic_sin_cos_axi_stream:main
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with: 
+          submodules: true
+
+      - name: Analysing the code with pylint
+        run: find -name "*.py" | xargs pylint
+
+      - name: Check verible format
+        run: find rtl/ -iname "*.sv" -print0 | xargs -0 -n1 verible-verilog-format --verify --inplace
+
+      - name: Check verible lint
+        shell: bash
+        run: verible-verilog-lint ./**/*.sv
+
+      - name: Run cocotb tests
+        run: pytest -s -o log_cli=True ./test/
