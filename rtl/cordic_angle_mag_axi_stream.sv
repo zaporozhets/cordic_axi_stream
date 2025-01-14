@@ -26,7 +26,6 @@ module cordic_angle_mag_axi_stream #(
 
   localparam integer WorkingWidth = CORDIC_DW + 2;
 
-  // 
   localparam integer PipelineStages = Iterations + 1;
   // arctan table
   wire [WorkingWidth-1:0] atan_table[Iterations+1];
@@ -41,14 +40,14 @@ module cordic_angle_mag_axi_stream #(
 
   assign s_axis_tready = m_axis_tready;
 
-  wire signed [CORDIC_DW-1:0] x_in = signed'(s_axis_tdata[    CORDIC_DW-1:0        ]);
-  wire signed [CORDIC_DW-1:0] y_in = signed'(s_axis_tdata[2 * CORDIC_DW-1:CORDIC_DW]);
+  wire signed [   CORDIC_DW-1:0] x_in = signed'(s_axis_tdata[CORDIC_DW-1:0]);
+  wire signed [   CORDIC_DW-1:0] y_in = signed'(s_axis_tdata[2*CORDIC_DW-1:CORDIC_DW]);
 
   wire signed [WorkingWidth-1:0] extended_x_in = x_in;
   wire signed [WorkingWidth-1:0] extended_y_in = y_in;
 
   // Input stage
-  integer j;
+  integer                        j;
   always @(posedge aclk) begin
     if (!aresetn) begin
       for (j = 0; j < PipelineStages; j = j + 1) begin
@@ -61,28 +60,30 @@ module cordic_angle_mag_axi_stream #(
     end else begin
       if (s_axis_tready) begin
         // Pre-rotation
-        case({extended_x_in[WorkingWidth-1], extended_y_in[WorkingWidth-1]})
-          2'b01: begin // Quadrant IV
+        case ({
+          extended_x_in[WorkingWidth-1], extended_y_in[WorkingWidth-1]
+        })
+          2'b01: begin  // Quadrant IV
             // Rotate by -315 degrees
-            x_pipeline[0] <=  extended_x_in - extended_y_in;
-            y_pipeline[0] <=  extended_x_in + extended_y_in;
+            x_pipeline[0] <= extended_x_in - extended_y_in;
+            y_pipeline[0] <= extended_x_in + extended_y_in;
             z_pipeline[0] <= atan_table[0] * 7;
           end
-          2'b11: begin // Quadrant III
+          2'b11: begin  // Quadrant III
             // Rotate by -225 degrees
             x_pipeline[0] <= -extended_x_in - extended_y_in;
-            y_pipeline[0] <=  extended_x_in - extended_y_in;
+            y_pipeline[0] <= extended_x_in - extended_y_in;
             z_pipeline[0] <= atan_table[0] * 5;
           end
-          2'b10: begin // Quadrant II
+          2'b10: begin  // Quadrant II
             // Rotate by -135 degrees
             x_pipeline[0] <= -extended_x_in + extended_y_in;
             y_pipeline[0] <= -extended_x_in - extended_y_in;
             z_pipeline[0] <= atan_table[0] * 3;
           end
-          default: begin // Quadrant I
+          default: begin  // Quadrant I
             // Rotate by -45 degrees
-            x_pipeline[0] <=  extended_x_in + extended_y_in;
+            x_pipeline[0] <= extended_x_in + extended_y_in;
             y_pipeline[0] <= -extended_x_in + extended_y_in;
             z_pipeline[0] <= atan_table[0] * 1;
           end
@@ -103,14 +104,14 @@ module cordic_angle_mag_axi_stream #(
 
         end else begin
           if (m_axis_tready) begin
-            if (y_pipeline[i]  < 0) begin
-                x_pipeline[i+1] <= x_pipeline[i] - (y_pipeline[i] >>> (i+1));
-                y_pipeline[i+1] <= y_pipeline[i] + (x_pipeline[i] >>> (i+1));
-                z_pipeline[i+1] <= z_pipeline[i] - atan_table[i+1];
+            if (y_pipeline[i] < 0) begin
+              x_pipeline[i+1] <= x_pipeline[i] - (y_pipeline[i] >>> (i + 1));
+              y_pipeline[i+1] <= y_pipeline[i] + (x_pipeline[i] >>> (i + 1));
+              z_pipeline[i+1] <= z_pipeline[i] - atan_table[i+1];
             end else begin
-                x_pipeline[i+1] <= x_pipeline[i] + (y_pipeline[i] >>> (i+1));
-                y_pipeline[i+1] <= y_pipeline[i] - (x_pipeline[i] >>> (i+1));
-                z_pipeline[i+1] <= z_pipeline[i] + atan_table[i+1];
+              x_pipeline[i+1] <= x_pipeline[i] + (y_pipeline[i] >>> (i + 1));
+              y_pipeline[i+1] <= y_pipeline[i] - (x_pipeline[i] >>> (i + 1));
+              z_pipeline[i+1] <= z_pipeline[i] + atan_table[i+1];
             end
             tlast_pipeline[i+1]  <= tlast_pipeline[i];
             tvalid_pipeline[i+1] <= tvalid_pipeline[i];
@@ -119,28 +120,28 @@ module cordic_angle_mag_axi_stream #(
       end
     end
   endgenerate
-  
+
   // Output stage
   wire [CORDIC_DW-1:0] result_magnitude = 16'(x_pipeline[PipelineStages-1][WorkingWidth-3:0]);
-  wire [CORDIC_DW-1:0] result_angle     = 16'(z_pipeline[PipelineStages-1][WorkingWidth-1:3]);
-  wire                 result_tvalid    = tvalid_pipeline[PipelineStages-1];
-  wire                 result_tlast     = tlast_pipeline[PipelineStages-1];
+  wire [CORDIC_DW-1:0] result_angle = 16'(z_pipeline[PipelineStages-1][WorkingWidth-1:3]);
+  wire                 result_tvalid = tvalid_pipeline[PipelineStages-1];
+  wire                 result_tlast = tlast_pipeline[PipelineStages-1];
 
   always @(posedge aclk) begin
     if (~aresetn) begin
-        m_axis_tdata  <= 0;
-        m_axis_tlast  <= 0;
-        m_axis_tvalid <= 0;
+      m_axis_tdata  <= 0;
+      m_axis_tlast  <= 0;
+      m_axis_tvalid <= 0;
     end else begin
-        m_axis_tdata  <= {result_magnitude, result_angle};
-        m_axis_tvalid <= result_tvalid;
-        m_axis_tlast  <= result_tlast;
+      m_axis_tdata  <= {result_magnitude, result_angle};
+      m_axis_tvalid <= result_tvalid;
+      m_axis_tlast  <= result_tlast;
     end
   end
 
   // Precomputed arctan values in radians
   generate
-    if (CORDIC_DW == 16) begin
+    if (CORDIC_DW == 16) begin : gen_arctan_18
       assign atan_table[0]  = 18'd32768;  // 45
       assign atan_table[1]  = 18'd19344;
       assign atan_table[2]  = 18'd10221;
