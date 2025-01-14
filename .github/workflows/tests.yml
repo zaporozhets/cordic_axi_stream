@@ -6,7 +6,7 @@ jobs:
   tests-cocotb:
     name: cocotb tests
     runs-on: ubuntu-latest
-    container: ghcr.io/zaporozhets/cordic_sin_cos_axi_stream:main
+    container: ghcr.io/zaporozhets/cordic_axi_stream:main
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
